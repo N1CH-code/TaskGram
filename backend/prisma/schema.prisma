@@ -1,0 +1,276 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  WORKER
+  EMPLOYER
+  BOTH
+}
+
+enum ProjectType {
+  JOB
+  FREELANCE
+  MICROTASK
+}
+
+enum ProjectStatus {
+  NEW
+  DISCUSSION
+  IN_PROGRESS
+  REVIEW
+  COMPLETED
+  CANCELLED
+}
+
+enum SubscriptionTier {
+  FREE
+  PREMIUM
+  PREMIUM_PRO
+}
+
+enum EmployerTier {
+  FREE
+  PUBLISHER
+  SUBSCRIBER
+}
+
+enum ContactStatus {
+  HIDDEN
+  REQUESTED
+  APPROVED
+}
+
+enum MessageType {
+  TEXT
+  FILE
+  SYSTEM
+}
+
+model User {
+  id                String    @id @default(uuid())
+  telegramId        String    @unique
+  username          String?
+  firstName         String?
+  lastName          String?
+  photoUrl          String?
+  phone             String?
+  role              UserRole  @default(BOTH)
+  description       String?
+  skills            String[]
+  rating            Float     @default(0)
+  completedProjects Int       @default(0)
+  activeProjects    Int       @default(0)
+  reviewsCount      Int       @default(0)
+  isPremium         Boolean   @default(false)
+  premiumExpiresAt  DateTime?
+  subscriptionTier  SubscriptionTier @default(FREE)
+  employerTier      EmployerTier     @default(FREE)
+  employerExpiresAt DateTime?
+  trialUsed         Boolean   @default(false)
+  isBlocked         Boolean   @default(false)
+  isAdmin           Boolean   @default(false)
+  referralCode      String?   @unique
+  referredBy        String?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  sentProjects          Project[]          @relation("ProjectEmployer")
+  assignedProjects      Project[]          @relation("ProjectWorker")
+  messages              Message[]
+  reviewsGiven          Review[]           @relation("ReviewAuthor")
+  reviewsReceived       Review[]           @relation("ReviewTarget")
+  notifications         Notification[]
+  portfolioItems        PortfolioItem[]
+  contactsInitiated     Contact[]          @relation("ContactInitiator")
+  contactsReceived      Contact[]          @relation("ContactReceiver")
+  subscriptions         Subscription[]
+  files                 File[]
+  uploadedFiles         ProjectFile[]
+  projectActions        ProjectAction[]
+
+  @@map("users")
+}
+
+model Category {
+  id          String       @id @default(uuid())
+  name        String
+  slug        String       @unique
+  description String?
+  icon        String?
+  parentId    String?
+  parent      Category?    @relation("CategoryParent", fields: [parentId], references: [id])
+  children    Category[]   @relation("CategoryParent")
+  projects    Project[]
+  createdAt   DateTime     @default(now())
+
+  @@map("categories")
+}
+
+model Project {
+  id           String        @id @default(uuid())
+  title        String
+  description  String
+  type         ProjectType   @default(FREELANCE)
+  status       ProjectStatus @default(NEW)
+  price        Float?
+  currency     String        @default("RUB")
+  categoryId   String?
+  category     Category?     @relation(fields: [categoryId], references: [id])
+  employerId   String
+  employer     User          @relation("ProjectEmployer", fields: [employerId], references: [id])
+  workerId     String?
+  worker       User?         @relation("ProjectWorker", fields: [workerId], references: [id])
+  isActive     Boolean       @default(true)
+  isFeatured   Boolean       @default(false)
+  deadline     DateTime?
+  skills       String[]
+  files        ProjectFile[]
+  messages     Message[]
+  reviews      Review[]
+  actions      ProjectAction[]
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  @@map("projects")
+}
+
+model ProjectFile {
+  id          String   @id @default(uuid())
+  projectId   String
+  project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  name        String
+  originalName String
+  mimeType    String
+  size        Int
+  url         String
+  uploadedById String
+  uploadedBy  User     @relation(fields: [uploadedById], references: [id])
+  createdAt   DateTime @default(now())
+
+  messages              Message[]
+
+  @@map("project_files")
+}
+
+model Message {
+  id          String      @id @default(uuid())
+  text        String?
+  type        MessageType @default(TEXT)
+  projectId   String
+  project     Project     @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  senderId    String
+  sender      User        @relation(fields: [senderId], references: [id])
+  fileId      String?
+  file        ProjectFile? @relation(fields: [fileId], references: [id])
+  isRead      Boolean     @default(false)
+  createdAt   DateTime    @default(now())
+
+  @@map("messages")
+}
+
+model ProjectAction {
+  id          String        @id @default(uuid())
+  projectId   String
+  project     Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  userId      String
+  user        User          @relation(fields: [userId], references: [id])
+  action      String
+  description String?
+  createdAt   DateTime      @default(now())
+
+  @@map("project_actions")
+}
+
+model Review {
+  id          String   @id @default(uuid())
+  projectId   String
+  project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  authorId    String
+  author      User     @relation("ReviewAuthor", fields: [authorId], references: [id])
+  targetId    String
+  target      User     @relation("ReviewTarget", fields: [targetId], references: [id])
+  rating      Int      @default(5)
+  comment     String?
+  createdAt   DateTime @default(now())
+
+  @@map("reviews")
+}
+
+model Contact {
+  id            String        @id @default(uuid())
+  projectId     String?
+  initiatorId   String
+  initiator     User          @relation("ContactInitiator", fields: [initiatorId], references: [id])
+  receiverId    String
+  receiver      User          @relation("ContactReceiver", fields: [receiverId], references: [id])
+  status        ContactStatus @default(HIDDEN)
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  @@unique([initiatorId, receiverId, projectId])
+  @@map("contacts")
+}
+
+model Subscription {
+  id            String           @id @default(uuid())
+  userId        String
+  user          User             @relation(fields: [userId], references: [id])
+  tier          SubscriptionTier
+  startDate     DateTime         @default(now())
+  endDate       DateTime
+  autoRenew     Boolean          @default(false)
+  paymentId     String?
+  createdAt     DateTime         @default(now())
+
+  @@map("subscriptions")
+}
+
+model PortfolioItem {
+  id          String   @id @default(uuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title       String
+  description String?
+  url         String?
+  fileUrl     String?
+  imageUrl    String?
+  tags        String[]
+  createdAt   DateTime @default(now())
+
+  @@map("portfolio_items")
+}
+
+model File {
+  id          String   @id @default(uuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name        String
+  originalName String
+  mimeType    String
+  size        Int
+  url         String
+  folder      String   @default("general")
+  createdAt   DateTime @default(now())
+
+  @@map("files")
+}
+
+model Notification {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title     String
+  message   String
+  type      String   @default("info")
+  isRead    Boolean  @default(false)
+  link      String?
+  createdAt DateTime @default(now())
+
+  @@map("notifications")
+}
