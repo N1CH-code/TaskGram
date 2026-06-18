@@ -53,6 +53,44 @@ export class AuthService {
     };
   }
 
+  async simpleAuthenticate(telegramUser: any): Promise<{ accessToken: string; user: any }> {
+    if (!telegramUser?.id) {
+      throw new UnauthorizedException('Invalid Telegram user data');
+    }
+
+    let user = await this.prisma.user.findUnique({
+      where: { telegramId: telegramUser.id.toString() },
+    });
+
+    if (!user) {
+      user = await this.createUser(telegramUser);
+    } else {
+      user = await this.prisma.user.update({
+        where: { id: user.id },
+        data: {
+          username: telegramUser.username || user.username,
+          firstName: telegramUser.first_name || user.firstName,
+          lastName: telegramUser.last_name || user.lastName,
+          photoUrl: telegramUser.photo_url || user.photoUrl,
+        },
+      });
+    }
+
+    if (user.isBlocked) {
+      throw new UnauthorizedException('User is blocked');
+    }
+
+    const payload = { sub: user.id, telegramId: user.telegramId };
+    const accessToken = this.jwtService.sign(payload);
+
+    await this.redis.set(`session:${user.id}`, accessToken, 'EX', 604800);
+
+    return {
+      accessToken,
+      user: this.sanitizeUser(user),
+    };
+  }
+
   async validateUser(userId: string): Promise<any> {
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
     if (!user || user.isBlocked) return null;

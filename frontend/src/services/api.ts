@@ -40,6 +40,7 @@ export default api
 
 export const authApi = {
   telegramLogin: (initData: string) => wrap(api.post('/auth/telegram', { initData })),
+  telegramSimpleLogin: (user: any) => wrap(api.post('/auth/telegram/simple', { user })),
 }
 
 export const usersApi = {

@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { authApi, usersApi } from '../services/api'
-import { getInitData } from '../services/telegram'
+import { getInitData, getTelegramUser } from '../services/telegram'
 
 interface User {
   id: string
@@ -59,18 +59,21 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   login: async () => {
     try {
       set({ loading: true, error: null })
-      const hasWebApp = !!(window as any).Telegram?.WebApp
-      const initData = getInitData()
-      if (!initData) {
-        set({
-          error: 'Telegram not available. WebApp: ' + (hasWebApp ? 'yes' : 'no') + ', URL: ' + window.location.href,
-          loading: false,
-        })
+      let initData = getInitData()
+      if (initData) {
+        const { accessToken, user } = await authApi.telegramLogin(initData)
+        localStorage.setItem('taskgram_token', accessToken)
+        set({ user, loading: false })
         return
       }
-      const { accessToken, user } = await authApi.telegramLogin(initData)
-      localStorage.setItem('taskgram_token', accessToken)
-      set({ user, loading: false })
+      const tgUser = getTelegramUser()
+      if (tgUser) {
+        const { accessToken, user } = await authApi.telegramSimpleLogin(tgUser)
+        localStorage.setItem('taskgram_token', accessToken)
+        set({ user, loading: false })
+        return
+      }
+      set({ error: 'Telegram not available', loading: false })
     } catch (err: any) {
       set({ error: err.message || 'Login failed', loading: false })
     }
