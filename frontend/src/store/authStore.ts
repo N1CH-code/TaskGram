@@ -56,7 +56,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     }
   },
 
-  login: async () => {
+  login: async (silent = false) => {
     try {
       set({ loading: true, error: null })
       let initData = getInitData()
@@ -73,9 +73,17 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         set({ user, loading: false })
         return
       }
-      set({ error: 'Telegram not available', loading: false })
+      if (!silent) {
+        set({ error: 'Telegram not available', loading: false })
+      } else {
+        set({ loading: false })
+      }
     } catch (err: any) {
-      set({ error: err.message || 'Login failed', loading: false })
+      if (!silent) {
+        set({ error: err.message || 'Login failed', loading: false })
+      } else {
+        set({ loading: false })
+      }
     }
   },
 

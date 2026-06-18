@@ -17,14 +17,26 @@ import AuthPage from './pages/AuthPage'
 import LoadingScreen from './components/ui/LoadingScreen'
 
 export default function App() {
-  const { user, loading, initialize } = useAuthStore()
+  const { user, loading, initialize, login } = useAuthStore()
   const [tgReady, setTgReady] = useState(false)
+  const [autoLoginDone, setAutoLoginDone] = useState(false)
 
   useEffect(() => {
     initTelegram()
     initialize()
     setTgReady(true)
   }, [])
+
+  useEffect(() => {
+    if (!tgReady || loading) return
+    if (user) return
+    if (autoLoginDone) return
+    const tg = (window as any).Telegram?.WebApp
+    if (tg) {
+      setAutoLoginDone(true)
+      login(true)
+    }
+  }, [tgReady, loading, user, autoLoginDone])
 
   if (!tgReady || loading) {
     return <LoadingScreen />
