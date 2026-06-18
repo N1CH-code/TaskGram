@@ -1,3 +1,7 @@
+export function isTelegramWebApp(): boolean {
+  return !!(window as any).Telegram?.WebApp
+}
+
 export function initTelegram() {
   const tg = (window as any).Telegram?.WebApp
   if (tg) {
@@ -14,9 +18,17 @@ export function getTelegramUser() {
   return tg?.initDataUnsafe?.user || null
 }
 
-export function getInitData() {
+export function getInitData(): string {
   const tg = (window as any).Telegram?.WebApp
-  return tg?.initData || ''
+  if (tg?.initData) {
+    return tg.initData
+  }
+  const params = new URLSearchParams(window.location.search)
+  const tgWebAppData = params.get('tgWebAppData')
+  if (tgWebAppData) {
+    return tgWebAppData
+  }
+  return ''
 }
 
 export function showAlert(message: string) {

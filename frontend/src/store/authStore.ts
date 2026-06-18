@@ -59,9 +59,13 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   login: async () => {
     try {
       set({ loading: true, error: null })
+      const hasWebApp = !!(window as any).Telegram?.WebApp
       const initData = getInitData()
       if (!initData) {
-        set({ error: 'Telegram not available', loading: false })
+        set({
+          error: 'Telegram not available. WebApp: ' + (hasWebApp ? 'yes' : 'no') + ', URL: ' + window.location.href,
+          loading: false,
+        })
         return
       }
       const { accessToken, user } = await authApi.telegramLogin(initData)
